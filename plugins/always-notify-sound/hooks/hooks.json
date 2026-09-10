@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/hooks/chime.exe",
+            "timeoutMs": 10000,
+            "statusMessage": "playing attention chime"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/hooks/chime.exe",
+            "timeoutMs": 10000,
+            "statusMessage": "playing attention chime"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/hooks/chime.exe",
+            "timeoutMs": 10000,
+            "statusMessage": "playing attention chime"
+          }
+        ]
+      }
+    ]
+  }
+}
