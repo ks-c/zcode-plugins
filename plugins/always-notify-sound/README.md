@@ -19,20 +19,15 @@ ZCode 内置的任务通知（`show-task-notification`）在窗口聚焦时会�
 | `PermissionRequest`  | 工具调用需要你授权（确认弹窗出现时） |
 | `PreToolUse` / `PostToolUse`（`AskUserQuestion`） | 助手向你提问征求确认 |
 
-声音由 `hooks/chime.exe` 播放 `hooks/chime.wav`（合成双音提示音）；多个事件在同一
-瞬间触发时会在 1.5 秒窗口内去重，只响一次。hook 始终返回 0，不会阻塞或报错会话。
+声音由 `hooks/chime.exe` 播放 `hooks/chime.wav`（合成双音提示音）；同一确认瞬间
+触发的多个 hook 事件会在 500ms 窗口内去重，只响一次；去重按**对话会话隔离**
+（依据 hook 注入的会话 ID），所以其他对话的提示音不会吞掉当前对话的这一声。
+hook 始终返回 0，不会阻塞或报错会话。
 
 ## 安装
 
-### 方式一：通过市场安装（推荐）
-
-1. **Settings → 插件管理 → 发现 → "+" → GitHub 仓库**
-2. 填入：`https://github.com/ks-c/zcode-plugins`
-3. 找到 **always-notify-sound** → 获取/安装 → 默认启用
-
-### 方式二：本地目录加载（不经过市场）
-
-在 `~/.zcode/cli/config.json` 的 `plugins.dirs` 中加入插件目录（默认启用）：
+该插件通过用户配置 `~/.zcode/cli/config.json` 的 `plugins.dirs` 加载（默认启用，
+无需 marketplace）：
 
 ```jsonc
 {

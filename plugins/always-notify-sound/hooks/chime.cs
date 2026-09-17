@@ -48,21 +48,30 @@ class Chime
     }
 
     // Foreground window belongs to ZCode.exe -> the app window is focused.
+    // Fail-open: if the foreground owner cannot be resolved (race), play anyway
+    // rather than silently dropping the chime.
     static bool IsZcodeFocused()
     {
+        IntPtr h = GetForegroundWindow();
+        if (h == IntPtr.Zero) return false;
+        uint pid;
+        if (GetWindowThreadProcessId(h, out pid) == 0 || pid == 0) return false;
         try
         {
-            IntPtr h = GetForegroundWindow();
-            if (h == IntPtr.Zero) return false;
-            uint pid;
-            GetWindowThreadProcessId(h, out pid);
-            if (pid == 0) return false;
             using (var p = System.Diagnostics.Process.GetProcessById((int)pid))
             {
                 return p.ProcessName.Equals("ZCode", StringComparison.OrdinalIgnoreCase);
             }
         }
-        catch { return false; }
+        catch { return true; }
+    }
+
+    // FNV-1a hash so the session id never shows up raw in a temp filename.
+    static string HashId(string s)
+    {
+        uint h = 2166136261u;
+        foreach (char c in s) { h ^= c; h *= 16777619u; }
+        return h.ToString("x8");
     }
 
     static int NormalizeVolume(double v)
@@ -202,14 +211,22 @@ class Chime
         if (volume < 0) volume = GetVolumePct();
         if (volume <= 0) return 0; // muted
 
-        // Dedup: several hook events can fire for the same confirmation moment; chime once per 1.5s.
+        // Dedup: several hook events can fire for the same confirmation moment.
+        // The stamp is keyed per conversation (ZCODE_SESSION_ID) so a chime in
+        // another conversation never swallows this one, and the window is short
+        // (500ms) so quick follow-up confirmations still chime.
         try
         {
-            string stamp = Path.Combine(Path.GetTempPath(), "zcode-notify-sound-last.txt");
+            string sessionId = Environment.GetEnvironmentVariable("ZCODE_SESSION_ID")
+                ?? Environment.GetEnvironmentVariable("CLAUDE_SESSION_ID") ?? "";
+            string stampName = string.IsNullOrEmpty(sessionId)
+                ? "zcode-notify-sound-last.txt"
+                : "zcode-notify-sound-last-" + HashId(sessionId) + ".txt";
+            string stamp = Path.Combine(Path.GetTempPath(), stampName);
             long last = 0;
             if (File.Exists(stamp)) long.TryParse(File.ReadAllText(stamp).Trim(), out last);
             long now = DateTime.UtcNow.Ticks;
-            if (now - last < 15000000L) return 0; // within 1.5 seconds
+            if (now - last < 5000000L) return 0; // within 0.5 seconds
             File.WriteAllText(stamp, now.ToString());
         }
         catch { }

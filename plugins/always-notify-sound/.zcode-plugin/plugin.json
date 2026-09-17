@@ -1,9 +1,9 @@
 {
   "name": "always-notify-sound",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Always plays the task-notification chime when ZCode needs your confirmation (tool permission request or AskUserQuestion), regardless of whether the ZCode window is focused.",
   "author": {
-    "name": "ks-c"
+    "name": "Administrator"
   },
   "license": "MIT",
   "hooks": "hooks",
