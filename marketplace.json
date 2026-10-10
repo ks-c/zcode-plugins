@@ -16,14 +16,14 @@
         "en": "Always Notify Sound",
         "zh-CN": "始终提示音"
       },
-      "version": "1.0.1",
+      "version": "1.1.0",
       "author": {
         "name": "ks-c"
       },
-      "description": "ZCode 需要你确认时（工具权限确认、AskUserQuestion 提问）始终有提示音：窗口聚焦时由插件播放提示音，离开窗口时由 ZCode 内置通知照常发声，不重不漏。音量可在插件管理界面配置（0-100）。通过 PermissionRequest / PreToolUse / PostToolUse hooks 触发，自带 1.5 秒去重，不会阻塞会话。",
+      "description": "ZCode 需要你操作时始终播放提示音——任何窗口、任何对话、无论是否在前台都不会漏报：需要你授权、向你提问、助手完成回复等你输入时都会响。音量与任务结束时也提示均可在插件管理界面配置。",
       "description_i18n": {
-        "en": "Always get a sound when ZCode needs your confirmation (tool permission request or AskUserQuestion): the plugin chimes while the window is focused, and the built-in ZCode notification sounds when you leave the window — no gap, no overlap. Volume is configurable in the plugin management UI (0-100). Triggered via PermissionRequest / PreToolUse / PostToolUse hooks with 1.5s dedup; never blocks the session.",
-        "zh-CN": "ZCode 需要你确认时（工具权限确认、AskUserQuestion 提问）始终有提示音：窗口聚焦时由插件播放提示音，离开窗口时由 ZCode 内置通知照常发声，不重不漏。音量可在插件管理界面配置（0-100）。通过 PermissionRequest / PreToolUse / PostToolUse hooks 触发，自带 1.5 秒去重，不会阻塞会话。"
+        "en": "Always plays an attention chime whenever ZCode needs your action (permission request, AskUserQuestion, or the agent finishing its turn) — in every window and every conversation, regardless of focus. Volume and the turn-end chime are configurable in the plugin management UI.",
+        "zh-CN": "ZCode 需要你操作时始终播放提示音——任何窗口、任何对话、无论是否在前台都不会漏报：需要你授权、向你提问、助手完成回复等你输入时都会响。音量与任务结束时也提示均可在插件管理界面配置。"
       },
       "category": "productivity",
       "keywords": [
@@ -31,7 +31,7 @@
         "sound",
         "chime",
         "volume",
-        "focus",
+        "alert",
         "permission",
         "hook"
       ],

@@ -1,9 +1,9 @@
 {
   "name": "always-notify-sound",
-  "version": "1.0.1",
-  "description": "Always plays the task-notification chime when ZCode needs your confirmation (tool permission request or AskUserQuestion), regardless of whether the ZCode window is focused.",
+  "version": "1.1.0",
+  "description": "Plays an attention chime whenever ZCode needs your action (tool permission request, AskUserQuestion, or the agent finishing its turn) — in every window and every conversation, regardless of focus.",
   "author": {
-    "name": "Administrator"
+    "name": "ks-c"
   },
   "license": "MIT",
   "hooks": "hooks",
@@ -13,6 +13,12 @@
       "title": "提示音音量",
       "description": "提示音音量百分比，0-100（0 为静音，默认 100）。修改后即时生效，无需重启。",
       "default": 100
+    },
+    "turnEndChime": {
+      "type": "boolean",
+      "title": "任务结束时也提示",
+      "description": "助手完成一轮回复（在等你输入）时也播放提示音，默认开启；关闭后仅在需要你授权或回答提问时提示。修改后即时生效。",
+      "default": true
     }
   }
 }

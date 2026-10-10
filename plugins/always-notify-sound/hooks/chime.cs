@@ -1,11 +1,15 @@
-// chime.cs — plays an attention chime when ZCode needs user confirmation AND the
-// ZCode window is focused. When the window is NOT focused the built-in ZCode
-// notification sound handles the alert instead, so this plugin only fills the
-// gap the app leaves open (focused window). Always returns 0.
+// chime.cs — plays an attention chime whenever ZCode needs the user's action.
+// v1.1: the sound is ALWAYS played regardless of window focus or which
+// conversation is in front (full takeover of the alert), so a confirmation in
+// any window/conversation is never missed. Hooks pass --event <name> so the
+// optional "turn end" chime can be turned off from the plugin management UI.
 //
-// Volume (0-100, values <= 1 are treated as fractions, e.g. 0.8 = 80%):
-//   1. plugins.options.<plugin-id>.volume in ~/.zcode/cli/config.json (set from
-//      Settings -> Plugin Management -> plugin -> Advanced)
+// Events: permission (tool permission request), question (AskUserQuestion),
+//         stop (agent finished its turn and waits for input).
+// Always returns 0 so it never blocks or errors the session.
+//
+// Volume (0-100; values <= 1 are treated as fractions, e.g. 0.8 = 80%):
+//   1. plugins.options.<plugin-id>.volume in ~/.zcode/cli/config.json (UI)
 //   2. env var ZCODE_NOTIFY_SOUND_VOLUME
 //   3. volume.txt next to this exe
 //   4. default 100
@@ -13,16 +17,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Media;
-using System.Runtime.InteropServices;
 using System.Text;
 
 class Chime
 {
-    [DllImport("user32.dll")]
-    static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")]
-    static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-
     static string PluginDir()
     {
         try { return Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ""; }
@@ -47,31 +45,52 @@ class Chime
         return "always-notify-sound";
     }
 
-    // Foreground window belongs to ZCode.exe -> the app window is focused.
-    // Fail-open: if the foreground owner cannot be resolved (race), play anyway
-    // rather than silently dropping the chime.
-    static bool IsZcodeFocused()
+    // Returns the plugin's own options from ~/.zcode/cli/config.json (plugins.options.<id>.*).
+    static Dictionary<string, object> ReadUiOptions(string pluginName)
     {
-        IntPtr h = GetForegroundWindow();
-        if (h == IntPtr.Zero) return false;
-        uint pid;
-        if (GetWindowThreadProcessId(h, out pid) == 0 || pid == 0) return false;
         try
         {
-            using (var p = System.Diagnostics.Process.GetProcessById((int)pid))
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string cfg = Path.Combine(home, ".zcode", "cli", "config.json");
+            if (!File.Exists(cfg)) return null;
+            var ser = new System.Web.Script.Serialization.JavaScriptSerializer();
+            var root = ser.DeserializeObject(File.ReadAllText(cfg)) as Dictionary<string, object>;
+            if (root == null || !root.ContainsKey("plugins")) return null;
+            var plugins = root["plugins"] as Dictionary<string, object>;
+            if (plugins == null || !plugins.ContainsKey("options")) return null;
+            var options = plugins["options"] as Dictionary<string, object>;
+            if (options == null) return null;
+            foreach (var kv in options)
             {
-                return p.ProcessName.Equals("ZCode", StringComparison.OrdinalIgnoreCase);
+                if (kv.Key.StartsWith(pluginName + "@", StringComparison.OrdinalIgnoreCase))
+                    return kv.Value as Dictionary<string, object>;
             }
         }
-        catch { return true; }
+        catch { }
+        return null;
     }
 
-    // FNV-1a hash so the session id never shows up raw in a temp filename.
-    static string HashId(string s)
+    static bool TryGetDouble(object val, out double result)
     {
-        uint h = 2166136261u;
-        foreach (char c in s) { h ^= c; h *= 16777619u; }
-        return h.ToString("x8");
+        result = 0;
+        if (val == null) return false;
+        if (val is int) { result = (int)val; return true; }
+        if (val is long) { result = (long)val; return true; }
+        if (val is double) { result = (double)val; return true; }
+        if (val is decimal) { result = (double)(decimal)val; return true; }
+        return double.TryParse(val.ToString(), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out result);
+    }
+
+    static bool TryGetBool(object val, out bool result)
+    {
+        result = false;
+        if (val == null) return false;
+        if (val is bool) { result = (bool)val; return true; }
+        string s = val.ToString().Trim();
+        if (s.Equals("true", StringComparison.OrdinalIgnoreCase) || s == "1" || s.Equals("yes", StringComparison.OrdinalIgnoreCase)) { result = true; return true; }
+        if (s.Equals("false", StringComparison.OrdinalIgnoreCase) || s == "0" || s.Equals("no", StringComparison.OrdinalIgnoreCase)) { result = false; return true; }
+        return false;
     }
 
     static int NormalizeVolume(double v)
@@ -82,75 +101,12 @@ class Chime
         return (int)pct;
     }
 
-    // Volume from the plugin-management UI: plugins.options.<id>.volume in config.json. -1 when unset.
-    static int ReadUiVolume(string pluginName)
+    // FNV-1a hash so the session id never shows up raw in a temp filename.
+    static string HashId(string s)
     {
-        try
-        {
-            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            string cfg = Path.Combine(home, ".zcode", "cli", "config.json");
-            if (!File.Exists(cfg)) return -1;
-            var ser = new System.Web.Script.Serialization.JavaScriptSerializer();
-            var root = ser.DeserializeObject(File.ReadAllText(cfg)) as Dictionary<string, object>;
-            if (root == null || !root.ContainsKey("plugins")) return -1;
-            var plugins = root["plugins"] as Dictionary<string, object>;
-            if (plugins == null || !plugins.ContainsKey("options")) return -1;
-            var options = plugins["options"] as Dictionary<string, object>;
-            if (options == null) return -1;
-            foreach (var kv in options)
-            {
-                if (kv.Key.StartsWith(pluginName + "@", StringComparison.OrdinalIgnoreCase))
-                {
-                    var opts = kv.Value as Dictionary<string, object>;
-                    if (opts != null && opts.ContainsKey("volume"))
-                    {
-                        object val = opts["volume"];
-                        double v;
-                        if (val is int) v = (int)val;
-                        else if (val is long) v = (long)val;
-                        else if (val is double) v = (double)val;
-                        else if (val is decimal) v = (double)(decimal)val;
-                        else if (val != null)
-                        {
-                            double dv;
-                            if (double.TryParse(val.ToString(),
-                                System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture, out dv)) v = dv;
-                            else v = 0;
-                        }
-                        else v = 0;
-                        return NormalizeVolume(v);
-                    }
-                }
-            }
-        }
-        catch { }
-        return -1;
-    }
-
-    // Volume from env var ZCODE_NOTIFY_SOUND_VOLUME, then volume.txt, else default 100.
-    static int GetVolumePct()
-    {
-        try
-        {
-            string env = Environment.GetEnvironmentVariable("ZCODE_NOTIFY_SOUND_VOLUME");
-            double ev;
-            if (!string.IsNullOrEmpty(env) && double.TryParse(env, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out ev))
-                return NormalizeVolume(ev);
-
-            string file = Path.Combine(PluginDir(), "volume.txt");
-            if (File.Exists(file))
-            {
-                string t = File.ReadAllText(file).Trim();
-                double fv;
-                if (double.TryParse(t, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out fv))
-                    return NormalizeVolume(fv);
-            }
-        }
-        catch { }
-        return 100;
+        uint h = 2166136261u;
+        foreach (char c in s) { h ^= c; h *= 16777619u; }
+        return h.ToString("x8");
     }
 
     // Scales a 16-bit PCM mono/stereo WAV's samples by volume (0..1). Null on unsupported format.
@@ -192,7 +148,7 @@ class Chime
         return outp;
     }
 
-    static int Main()
+    static int Main(string[] args)
     {
         // Opt-out: env var ZCODE_NOTIFY_SOUND=0/off, disabled.flag.
         try
@@ -203,18 +159,59 @@ class Chime
         }
         catch { }
 
-        // Focus gate: focused window -> our chime; leaving the window -> the built-in
-        // ZCode notification sound plays instead (no double sound, no gap).
-        if (!IsZcodeFocused()) return 0;
+        // --event <name>: permission | question | stop (default: generic prompt)
+        string eventName = "";
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == "--event") eventName = args[i + 1];
+        eventName = eventName.Trim().ToLowerInvariant();
 
-        int volume = ReadUiVolume(PluginName());
-        if (volume < 0) volume = GetVolumePct();
+        Dictionary<string, object> ui = ReadUiOptions(PluginName());
+
+        // Optional: skip the "agent finished, waiting for you" chime when disabled in the UI.
+        if (eventName == "stop" && ui != null && ui.ContainsKey("turnEndChime"))
+        {
+            bool turnEnd;
+            if (TryGetBool(ui["turnEndChime"], out turnEnd) && !turnEnd) return 0;
+        }
+
+        // Volume: UI option > env var > volume.txt > 100
+        int volume = -1;
+        if (ui != null && ui.ContainsKey("volume"))
+        {
+            double uv;
+            if (TryGetDouble(ui["volume"], out uv)) volume = NormalizeVolume(uv);
+        }
+        if (volume < 0)
+        {
+            volume = 100;
+            try
+            {
+                string env = Environment.GetEnvironmentVariable("ZCODE_NOTIFY_SOUND_VOLUME");
+                double ev;
+                if (!string.IsNullOrEmpty(env) && double.TryParse(env, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out ev))
+                    volume = NormalizeVolume(ev);
+                else
+                {
+                    string file = Path.Combine(PluginDir(), "volume.txt");
+                    if (File.Exists(file))
+                    {
+                        string t = File.ReadAllText(file).Trim();
+                        double fv;
+                        if (double.TryParse(t, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out fv))
+                            volume = NormalizeVolume(fv);
+                    }
+                }
+            }
+            catch { }
+        }
         if (volume <= 0) return 0; // muted
 
         // Dedup: several hook events can fire for the same confirmation moment.
-        // The stamp is keyed per conversation (ZCODE_SESSION_ID) so a chime in
-        // another conversation never swallows this one, and the window is short
-        // (500ms) so quick follow-up confirmations still chime.
+        // Keyed per conversation (ZCODE_SESSION_ID) so a chime in another
+        // conversation never swallows this one; 500ms window so quick follow-ups
+        // still chime.
         try
         {
             string sessionId = Environment.GetEnvironmentVariable("ZCODE_SESSION_ID")

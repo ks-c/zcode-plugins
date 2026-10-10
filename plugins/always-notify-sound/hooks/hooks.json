@@ -6,6 +6,7 @@
           {
             "type": "process",
             "command": "${ZCODE_PLUGIN_ROOT}/hooks/chime.exe",
+            "args": ["--event", "permission"],
             "timeoutMs": 10000,
             "statusMessage": "playing attention chime"
           }
@@ -19,19 +20,20 @@
           {
             "type": "process",
             "command": "${ZCODE_PLUGIN_ROOT}/hooks/chime.exe",
+            "args": ["--event", "question"],
             "timeoutMs": 10000,
             "statusMessage": "playing attention chime"
           }
         ]
       }
     ],
-    "PostToolUse": [
+    "Stop": [
       {
-        "matcher": "AskUserQuestion",
         "hooks": [
           {
             "type": "process",
             "command": "${ZCODE_PLUGIN_ROOT}/hooks/chime.exe",
+            "args": ["--event", "stop"],
             "timeoutMs": 10000,
             "statusMessage": "playing attention chime"
           }
