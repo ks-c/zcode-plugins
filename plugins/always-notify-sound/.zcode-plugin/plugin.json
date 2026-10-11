@@ -1,6 +1,6 @@
 {
   "name": "always-notify-sound",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Plays an attention chime whenever ZCode needs your action (tool permission request, AskUserQuestion, or the agent finishing its turn) — in every window and every conversation, regardless of focus.",
   "author": {
     "name": "ks-c"

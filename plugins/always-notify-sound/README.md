@@ -21,7 +21,7 @@ ZCode 内置的任务通知（`show-task-notification`）在窗口聚焦时会�
 | `PreToolUse`（`AskUserQuestion`） | 助手向你提问征求确认 | `--event question` |
 | `Stop`               | 助手完成一轮回复、等待你输入 | `--event stop` |
 
-声音由 `hooks/chime.exe` 播放 `hooks/chime.wav`（合成双音提示音）；同一确认瞬间
+声音由 `hooks/chime.exe` 播放 `hooks/chime.wav`（简谱 6 5 6 3 6 1 5 的弦乐短句，264 BPM 小快板，约 2.7 秒）；同一确认瞬间
 触发的多个 hook 事件会在 500ms 窗口内去重，只响一次；去重按**对话会话隔离**
 （依据 hook 注入的会话 ID），所以其他对话的提示音不会吞掉当前对话的这一声。
 hook 始终返回 0，不会阻塞或报错会话。
@@ -102,4 +102,4 @@ set ZCODE_NOTIFY_SOUND_VOLUME=60
 | `hooks/hooks.json` | hook 声明（PermissionRequest + AskUserQuestion + Stop） |
 | `hooks/chime.exe` | 提示音播放程序（音量读取 + 采样缩放，.NET Framework 编译，亦可用 csc 从 `chime.cs` 重新编译） |
 | `hooks/chime.cs` | 提示音程序源码 |
-| `hooks/chime.wav` | 提示音音频（44.1kHz 16bit 双音合成） |
+| `hooks/chime.wav` | 提示音音频（44.1kHz 16bit，简谱 6 5 6 3 6 1 5 弦乐短句，C4 起，264 BPM） |
